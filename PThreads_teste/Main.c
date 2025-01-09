@@ -1,100 +1,161 @@
 #pragma once
 #define _CRT_SECURE_NO_WARNINGS 1
 #define _WINSOCK_DEPRECATED_NO_WARNINGS 1
+
 #pragma comment(lib,"pthreadVC2.lib")
+
 #define HAVE_STRUCT_TIMESPEC
-
-#define LARGURA 10000
-#define ALTURA 10000
-#define PRIME_NUMBERS 0
-
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
 
-int** Alocar_matriz(int m, int n);
+#define DIMENSAO_MATRIZ 10000
+
+int** Alocar_matriz();
+int thread_task(int dimensao_bloco);
 int ehPrimo(int n);
 
-int** matrix;
-int qtd_numeros_primos = 0;
-
+int** matriz;
+int numeros_primos = 0;
+int* blocos;
+pthread_mutex_t mutex;
 
 int main(int argc, char* argv[]) {
-
-    clock_t t;
     
+    clock_t t;
+    pthread_t* threads = NULL;
+
+    int num_threads;
+    int dimensao_bloco = 10000;
+
+    printf("Digite o número de threads: ");
+    scanf("%d", &num_threads);
+    printf("Digite a dimensão do bloco: ");
+    scanf("%d", &dimensao_bloco);
+
+    matriz = Alocar_matriz();
+    blocos = calloc((DIMENSAO_MATRIZ / dimensao_bloco) * (DIMENSAO_MATRIZ / dimensao_bloco), sizeof(int));
+    threads = malloc(num_threads * sizeof(pthread_t));
+
+    if (threads == NULL) {
+        perror("Erro ao alocar memória para threads");
+        return 1;
+    }
+
     t = clock();
 
-    pthread_t thread;
+    pthread_mutex_init(&mutex, NULL);
 
-    matrix = Alocar_matriz(ALTURA, LARGURA);
+    // Criar threads
+    for (int i = 0; i < num_threads; i++) {
+        pthread_create(&threads[i], NULL, thread_task, dimensao_bloco);
+    }
 
-    qtd_de_n_primos();
+    // Esperar todas as threads terminarem
+    for (int i = 0; i < num_threads; i++) {
+        if (pthread_join(threads[i], NULL) != 0) {
+            perror("Pthread_join falhou!");
+            return 1;
+        }
+    }
+
+    pthread_mutex_destroy(&mutex);
 
     t = clock() - t;
 
-    printf("Quantidade De Primos = %d \n", qtd_numeros_primos);
-    printf("Tempo de execucao: %lf", ((double)t) / ((CLOCKS_PER_SEC / 1000)));
+    printf("Quantidade De Primos = %d \n", numeros_primos);
+    printf("Tempo de execucao: %lf", ((double)t) / CLOCKS_PER_SEC);
+
+    free(threads);
+    free(blocos);
+    for (int i = 0; i < DIMENSAO_MATRIZ; i++) {
+        free(matriz[i]);
+    }
+    free(matriz);
 
     return 0;
 }
 
-int** Alocar_matriz(int m, int n)
+int** Alocar_matriz()
 {
     int** v;
     int i;
-    int qtdEhPrimos = 0;
 
-    if (m < 1 || n < 1) {
+    if (DIMENSAO_MATRIZ < 1) {
         printf("** Erro: Parametro invalido **\n");
         return (NULL);
     }
 
-    v = calloc(m, sizeof(int*));
+    v = calloc(DIMENSAO_MATRIZ, sizeof(int*));
     if (v == NULL) {
         printf("** Erro: Memoria Insuficiente **");
         return (NULL);
     }
 
-    for (i = 0; i < m; i++) {
-        v[i] = calloc(n, sizeof(int));
+    for (i = 0; i < DIMENSAO_MATRIZ; i++) {
+        v[i] = calloc(DIMENSAO_MATRIZ, sizeof(int));
         if (v[i] == NULL) {
             printf("** Erro: Memoria Insuficiente **");
             return (NULL);
         }
     }
 
-    srand(time(NULL));
-
-    /*
-    coloca qualquer numero dentro do srand() pra seed fixa
-    */
-
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
+	// Popular a matriz com numeros aleatorios
+    srand(42);
+    for (int i = 0; i < DIMENSAO_MATRIZ; i++) {
+        for (int j = 0; j < DIMENSAO_MATRIZ; j++) {
             v[i][j] = rand() % 32000;
-            //printf("%i ", v[i][j]);
         }
-        //printf("\n");
     }
-    
 
     return (v);
 }
 
-int qtd_de_n_primos() {
-    
-    for (int i = 0; i < ALTURA; i++) {
-        for (int j = 0; j < LARGURA; j++) {
-            qtd_numeros_primos += ehPrimo(matrix[i][j]);
+// Funcao que calcula a quantidade de numeros primos em uma matriz m x n
+// Essa função deu ruim fml! -->
+int thread_task(int dimensao_bloco) {
+	// Busca por blocos vazios
+    int b = 0;
+
+    pthread_mutex_lock(&mutex);
+
+	while (blocos[b] != 0) {
+		b++;
+	}
+	blocos[b] = 1; // Marcar bloco como ocupado
+
+	pthread_mutex_unlock(&mutex);
+
+    // Calcular os índices do bloco
+	int qtd_blc_linha;
+	if (DIMENSAO_MATRIZ % dimensao_bloco != 0) {
+	    qtd_blc_linha = DIMENSAO_MATRIZ / dimensao_bloco + 1;
+    }
+    else {
+	    qtd_blc_linha = DIMENSAO_MATRIZ / dimensao_bloco;
+    }
+
+    int linha_ini = (b / qtd_blc_linha) * dimensao_bloco;
+    int linha_fim = linha_ini + dimensao_bloco;
+    if (linha_fim > DIMENSAO_MATRIZ) linha_fim = DIMENSAO_MATRIZ - 1; // Garantir que não ultrapasse os limites
+
+    int coluna_ini = (b % qtd_blc_linha) * dimensao_bloco;
+    int coluna_fim = coluna_ini + dimensao_bloco;
+    if (coluna_fim > DIMENSAO_MATRIZ) coluna_fim = DIMENSAO_MATRIZ - 1; // Garantir que não ultrapasse os limites
+
+    // Busca por números primos nesse bloco
+    for (int i = linha_ini; i < linha_fim; i++) {
+        for (int j = coluna_ini; j < coluna_fim; j++) {
+            pthread_mutex_lock(&mutex);
+            numeros_primos += ehPrimo(matriz[i][j]);
+            pthread_mutex_unlock(&mutex);
         }
     }
 }
 
 int ehPrimo(int n) {
-
     if (n < 2) {
         return 0;
     }
