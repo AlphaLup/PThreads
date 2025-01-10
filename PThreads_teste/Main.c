@@ -14,7 +14,8 @@
 #define DIMENSAO_MATRIZ 10000
 
 int** Alocar_matriz();
-int thread_task(int dimensao_bloco);
+void parallel_task(int dimensao_bloco);
+void serial_task();
 int ehPrimo(int n);
 
 int** matriz;
@@ -30,7 +31,8 @@ int main(int argc, char* argv[]) {
     int num_threads;
     int dimensao_bloco = 10000;
 
-    printf("Digite o número de threads: ");
+    printf("=== Configuração da busca paralela ===");
+    printf("\nDigite o número de threads: ");
     scanf("%d", &num_threads);
     printf("Digite a dimensão do bloco: ");
     scanf("%d", &dimensao_bloco);
@@ -44,14 +46,29 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    printf("\n== Teste Serial ==\n");
+
     t = clock();
+
+    serial_task(dimensao_bloco);
+
+    t = clock() - t;
+
+    printf("\nQuantidade De Primos = %d \n", numeros_primos);
+    printf("Tempo de execução: %lf\n", ((double)t) / CLOCKS_PER_SEC);
+
+    numeros_primos = 0;
+
+	printf("\n== Teste Paralelo ==");
 
     pthread_mutex_init(&mutex, NULL);
 
     // Criar threads
     for (int i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, thread_task, dimensao_bloco);
+        pthread_create(&threads[i], NULL, parallel_task, dimensao_bloco);
     }
+
+    t = clock();
 
     // Esperar todas as threads terminarem
     for (int i = 0; i < num_threads; i++) {
@@ -61,12 +78,12 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    pthread_mutex_destroy(&mutex);
-
     t = clock() - t;
 
-    printf("Quantidade De Primos = %d \n", numeros_primos);
-    printf("Tempo de execucao: %lf", ((double)t) / CLOCKS_PER_SEC);
+    pthread_mutex_destroy(&mutex);
+
+    printf("\nQuantidade De Primos = %d \n", numeros_primos);
+    printf("Tempo de execucao: %lf\n", ((double)t) / CLOCKS_PER_SEC);
 
     free(threads);
     free(blocos);
@@ -115,42 +132,54 @@ int** Alocar_matriz()
 
 // Funcao que calcula a quantidade de numeros primos em uma matriz m x n
 // Essa função deu ruim fml! -->
-int thread_task(int dimensao_bloco) {
-	// Busca por blocos vazios
-    int b = 0;
-
-    pthread_mutex_lock(&mutex);
-
-	while (blocos[b] != 0) {
-		b++;
-	}
-	blocos[b] = 1; // Marcar bloco como ocupado
-
-	pthread_mutex_unlock(&mutex);
-
-    // Calcular os índices do bloco
-	int qtd_blc_linha;
-	if (DIMENSAO_MATRIZ % dimensao_bloco != 0) {
-	    qtd_blc_linha = DIMENSAO_MATRIZ / dimensao_bloco + 1;
-    }
-    else {
-	    qtd_blc_linha = DIMENSAO_MATRIZ / dimensao_bloco;
-    }
-
-    int linha_ini = (b / qtd_blc_linha) * dimensao_bloco;
-    int linha_fim = linha_ini + dimensao_bloco;
-    if (linha_fim > DIMENSAO_MATRIZ) linha_fim = DIMENSAO_MATRIZ - 1; // Garantir que não ultrapasse os limites
-
-    int coluna_ini = (b % qtd_blc_linha) * dimensao_bloco;
-    int coluna_fim = coluna_ini + dimensao_bloco;
-    if (coluna_fim > DIMENSAO_MATRIZ) coluna_fim = DIMENSAO_MATRIZ - 1; // Garantir que não ultrapasse os limites
-
-    // Busca por números primos nesse bloco
-    for (int i = linha_ini; i < linha_fim; i++) {
-        for (int j = coluna_ini; j < coluna_fim; j++) {
-            pthread_mutex_lock(&mutex);
-            numeros_primos += ehPrimo(matriz[i][j]);
+void parallel_task(int dimensao_bloco) {
+    int num_blocos = (DIMENSAO_MATRIZ / dimensao_bloco) * (DIMENSAO_MATRIZ / dimensao_bloco);
+    
+    for (int i = 0; i < num_blocos; i++) {
+		pthread_mutex_lock(&mutex);
+        if (blocos[i] == 0) {
+            blocos[i] = 1;
             pthread_mutex_unlock(&mutex);
+            
+            int qtd_blc_linha;
+            if (DIMENSAO_MATRIZ % dimensao_bloco != 0) {
+                qtd_blc_linha = DIMENSAO_MATRIZ / dimensao_bloco + 1;
+            }
+            else {
+                qtd_blc_linha = DIMENSAO_MATRIZ / dimensao_bloco;
+            }
+
+            int linha_ini = (i / qtd_blc_linha) * dimensao_bloco;
+            int linha_fim = linha_ini + dimensao_bloco;
+            if (linha_fim > DIMENSAO_MATRIZ) linha_fim = DIMENSAO_MATRIZ - 1; // Garantir que não ultrapasse os limites
+
+            int coluna_ini = (i % qtd_blc_linha) * dimensao_bloco;
+            int coluna_fim = coluna_ini + dimensao_bloco;
+            if (coluna_fim > DIMENSAO_MATRIZ) coluna_fim = DIMENSAO_MATRIZ - 1; // Garantir que não ultrapasse os limites
+
+            int contador = 0;
+            // Busca por números primos nesse bloco
+            for (int i = linha_ini; i < linha_fim; i++) {
+                for (int j = coluna_ini; j < coluna_fim; j++) {
+					contador += ehPrimo(matriz[i][j]);
+                }
+            }
+
+			pthread_mutex_lock(&mutex);
+			numeros_primos += contador;
+			pthread_mutex_unlock(&mutex);
+
+            printf("Bloco %d: %d primos\n", i, contador);
+        } else {
+			pthread_mutex_unlock(&mutex);
+        }
+    }
+}
+
+void serial_task() {
+    for (int i = 0; i < DIMENSAO_MATRIZ; i++) {
+        for (int j = 0; j < DIMENSAO_MATRIZ; j++) {
+            numeros_primos += ehPrimo(matriz[i][j]);
         }
     }
 }
