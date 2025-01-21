@@ -55,11 +55,11 @@ int main(int argc, char* argv[]) {
     t = clock() - t;
 
     printf("\nQuantidade De Primos = %d \n", numeros_primos);
-    printf("Tempo de execução: %lf\n", ((double)t) / CLOCKS_PER_SEC);
+    printf("Tempo de execucao: %lf\n", ((double)t) / CLOCKS_PER_SEC);
 
     numeros_primos = 0;
 
-	printf("\n== Teste Paralelo ==");
+	printf("\n== Teste Paralelo ==\n");
 
     pthread_mutex_init(&mutex, NULL);
 
@@ -188,7 +188,8 @@ int ehPrimo(int n) {
     if (n < 2) {
         return 0;
     }
-    for (int i = 2; i < sqrt(n); i++) {
+    double limite = sqrt(n);
+    for (int i = 2; i < limite; i++) {
         if (n % i == 0) {
             return 0;
         }
