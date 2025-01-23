@@ -11,11 +11,16 @@
 #include <math.h>
 #include <time.h>
 
-#define DIMENSAO_MATRIZ_X 1000000
-#define DIMENSAO_MATRIZ_Y 1000000
+#define DIMENSAO_MATRIZ_X 10000
+#define DIMENSAO_MATRIZ_Y 10000
+
+typedef struct macrobloco {
+	int dim_x;
+	int dim_y;
+} Macrobloco;
 
 int** Alocar_matriz();
-void parallel_task(int dimensao_bloco_x, int dimensao_bloco_y);
+void * parallel_task(void * args);
 void serial_task();
 int ehPrimo(int n);
 
@@ -28,27 +33,29 @@ int main(int argc, char* argv[]) {
     
     clock_t t;
     pthread_t* threads = NULL;
+    Macrobloco blc;
 
     int num_threads;
-    int dimensao_bloco_x = 10000;
-    int dimensao_bloco_y = 10000;
 
-    printf("=== Configuração da busca paralela ===");
-    printf("\nDigite o número de threads: ");
+    printf("=== Configuracao da busca paralela ===");
+    printf("\nDigite o numero de threads: ");
     scanf("%d", &num_threads);
  
-	printf("Digite a dimensão horizontal do bloco: ");
-	scanf("%d", &dimensao_bloco_x);
-	printf("Digite a dimensão vertical do bloco: ");
-	scanf("%d", &dimensao_bloco_y);
+	printf("Digite a dimensao horizontal do bloco: ");
+	scanf("%d", &blc.dim_x);
+	printf("Digite a dimensao vertical do bloco: ");
+	scanf("%d", &blc.dim_y);
     
-    while (dimensao_bloco_x > DIMENSAO_MATRIZ_X || dimensao_bloco_y > DIMENSAO_MATRIZ_Y) {
-
+    while (blc.dim_x > DIMENSAO_MATRIZ_X || blc.dim_y > DIMENSAO_MATRIZ_Y || blc.dim_x < 1 || blc.dim_y < 1) {
+        printf("** Erro: Dimensao do macrobloco inválido **\n");
+		printf("Digite a dimensao horizontal do bloco: ");
+		scanf("%d", &blc.dim_x);
+		printf("Digite a dimensao vertical do bloco: ");
+		scanf("%d", &blc.dim_y);
     }
    
-
     matriz = Alocar_matriz();
-    blocos = calloc((DIMENSAO_MATRIZ_X / dimensao_bloco_x) * (DIMENSAO_MATRIZ_Y / dimensao_bloco_y), sizeof(int));
+    blocos = calloc((DIMENSAO_MATRIZ_X / blc.dim_x) * (DIMENSAO_MATRIZ_Y / blc.dim_y), sizeof(int));
     threads = malloc(num_threads * sizeof(pthread_t));
 
     if (threads == NULL) {
@@ -75,7 +82,7 @@ int main(int argc, char* argv[]) {
 
     // Criar threads
     for (int i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, parallel_task, dimensao_bloco_x, dimensao_bloco_y);
+        pthread_create(&threads[i], NULL, parallel_task, (void *) &blc);
     }
 
     t = clock();
@@ -141,9 +148,9 @@ int** Alocar_matriz()
 }
 
 // Funcao que calcula a quantidade de numeros primos em uma matriz m x n
-// Essa função deu ruim fml! -->
-void parallel_task(int dimensao_bloco_x, int dimensao_bloco_y) {
-    int num_blocos = (DIMENSAO_MATRIZ_X / dimensao_bloco_x) * (DIMENSAO_MATRIZ_Y / dimensao_bloco_y);
+void * parallel_task(void * args) {
+    Macrobloco* mb = (Macrobloco*)args;
+    int num_blocos = (DIMENSAO_MATRIZ_X / mb->dim_x) * (DIMENSAO_MATRIZ_Y / mb->dim_y);
     
     for (int i = 0; i < num_blocos; i++) {
 		pthread_mutex_lock(&mutex);
@@ -151,21 +158,13 @@ void parallel_task(int dimensao_bloco_x, int dimensao_bloco_y) {
             blocos[i] = 1;
             pthread_mutex_unlock(&mutex);
             
-            int qtd_blc_linha;
-            
-            // if (DIMENSAO_MATRIZ % dimensao_bloco != 0) {
-            //     qtd_blc_linha = DIMENSAO_MATRIZ / dimensao_bloco + 1;
-            // }
-    
-            qtd_blc_linha = DIMENSAO_MATRIZ_X / dimensao_bloco_x;
+            int qtd_blc_linha = DIMENSAO_MATRIZ_X / mb->dim_x;;
   
-            int linha_ini = (i / qtd_blc_linha) * dimensao_bloco_y;
-            int linha_fim = linha_ini + dimensao_bloco_y;
-            // if (linha_fim > DIMENSAO_MATRIZ) linha_fim = DIMENSAO_MATRIZ - 1; // Garantir que não ultrapasse os limites
+            int linha_ini = (i / qtd_blc_linha) * mb->dim_y;
+            int linha_fim = linha_ini + mb->dim_y;
 
-            int coluna_ini = (i % qtd_blc_linha) * dimensao_bloco_x;
-            int coluna_fim = coluna_ini + dimensao_bloco_x;
-            // if (coluna_fim > DIMENSAO_MATRIZ) coluna_fim = DIMENSAO_MATRIZ - 1; // Garantir que não ultrapasse os limites
+            int coluna_ini = (i % qtd_blc_linha) * mb->dim_x;
+            int coluna_fim = coluna_ini + mb->dim_x;
 
             int contador = 0;
             // Busca por números primos nesse bloco
@@ -179,7 +178,8 @@ void parallel_task(int dimensao_bloco_x, int dimensao_bloco_y) {
 			numeros_primos += contador;
 			pthread_mutex_unlock(&mutex);
 
-            printf("Bloco %d: %d primos\n", i, contador);
+            // Imprime a quantidade de primos por bloco
+            // printf("Bloco %d: %d primos\n", i, contador);
         } else {
 			pthread_mutex_unlock(&mutex);
         }
