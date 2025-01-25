@@ -11,8 +11,8 @@
 #include <math.h>
 #include <time.h>
 
-#define DIMENSAO_MATRIZ_X 1000000
-#define DIMENSAO_MATRIZ_Y 1000000
+#define DIMENSAO_MATRIZ_X 50000
+#define DIMENSAO_MATRIZ_Y 50000
 
 int** Alocar_matriz();
 void parallel_task(int dimensao_bloco_x, int dimensao_bloco_y);
