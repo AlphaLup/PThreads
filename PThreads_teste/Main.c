@@ -39,8 +39,8 @@ int main(int argc, char* argv[]) {
     int num_threads;
     int opcao;
     
-    printf("\n== Contador de Primos ==");
-	printf("\n\n-> Escolha a opção de busca:");
+    printf("\n=== Contador de Primos ===");
+	printf("\n\n--> Escolha a opcao:");
     printf("\n1. Busca Serial");
     printf("\n2. Busca Paralela");
     printf("\n3. Ambas");
@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (opcao == 1 || opcao == 3) {
-        printf("\n== Busca Serial ==\n");
+        printf("\n=== Busca Serial ===\n");
 
         t = clock();
 
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (opcao == 2 || opcao == 3) {
-        printf("\n== Busca Paralela ==\n");
+        printf("\n=== Busca Paralela ===\n");
 
         printf("\n--> Configuracao da busca paralela");
         printf("\nDigite o numero de threads: ");
