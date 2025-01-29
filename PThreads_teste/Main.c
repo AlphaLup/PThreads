@@ -15,6 +15,7 @@
 #define DIMENSAO_MATRIZ_X 20000
 #define DIMENSAO_MATRIZ_Y 20000
 
+// Estrutura para acessar as dimensões do macrobloco
 typedef struct Macrobloco {
 	int dim_x;
 	int dim_y;
@@ -25,10 +26,10 @@ void* parallel_task(void * args);
 void serial_task();
 int ehPrimo(int n);
 
-int** matriz;
-int numeros_primos = 0;
-int bloco_livre = 0;
-pthread_mutex_t mutex;
+int** matriz; // Matriz de inteiros aleatórios
+int numeros_primos = 0; // Contador de números primos
+int bloco_livre = 0; // Número do próximo macrobloco livre
+pthread_mutex_t mutex; // Mutex para controlar o acesso a variáveis compartilhadas
 
 int main(int argc, char* argv[]) {
     
@@ -165,12 +166,14 @@ int** Alocar_matriz()
 }
 
 // Funcao que calcula a quantidade de numeros primos em uma matriz m x n
+// Cada thread calcula a quantidade de primos em um bloco da matriz e atualiza a variável global numeros_primos
 void * parallel_task(void * args) {
     macrobloco* mb = (macrobloco*) args;
     int num_blocos = (DIMENSAO_MATRIZ_X / mb->dim_x) * (DIMENSAO_MATRIZ_Y / mb->dim_y);
     int bloco_atual;
 
 	while (1) {
+        // Região crítica para acessar o próximo bloco livre
 		pthread_mutex_lock(&mutex);
 		if (bloco_livre >= num_blocos) {
 			pthread_mutex_unlock(&mutex);
@@ -180,6 +183,7 @@ void * parallel_task(void * args) {
 		bloco_livre++;
         pthread_mutex_unlock(&mutex);
             
+		// Cálculo das coordenadas do bloco atual
         int qtd_blc_linha = DIMENSAO_MATRIZ_X / mb->dim_x;;
   
         int linha_ini = (bloco_atual / qtd_blc_linha) * mb->dim_y;
@@ -189,6 +193,7 @@ void * parallel_task(void * args) {
         int coluna_fim = coluna_ini + mb->dim_x;
 
         int contador = 0;
+
         // Busca por números primos nesse bloco
         for (int i = linha_ini; i < linha_fim; i++) {
             for (int j = coluna_ini; j < coluna_fim; j++) {
@@ -196,6 +201,7 @@ void * parallel_task(void * args) {
             }
         }
 
+		// Região crítica para atualizar a quantidade de primos
 		pthread_mutex_lock(&mutex);
 		numeros_primos += contador;
 		pthread_mutex_unlock(&mutex);
@@ -207,6 +213,8 @@ void * parallel_task(void * args) {
 	return NULL;
 }
 
+// Função que calcula a quantidade de números primos em uma matriz m x n
+// Implementação serial
 void serial_task() {
     for (int i = 0; i < DIMENSAO_MATRIZ_Y; i++) {
         for (int j = 0; j < DIMENSAO_MATRIZ_X; j++) {
@@ -215,6 +223,7 @@ void serial_task() {
     }
 }
 
+// Função que verifica se um número é primo
 int ehPrimo(int n) {
     if (n < 2) {
         return 0;
